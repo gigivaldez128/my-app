@@ -8,9 +8,9 @@ const Layout: React.FC = () => {
   const isDashboard = location.pathname.startsWith('/dashboard');
 
   return (
-    <div className="layout">
+    <div className={`layout ${isDashboard ? 'layout--dashboard' : ''}`}>
       {/* Modular Header / Navbar */}
-      <Header />
+      {!isDashboard && <Header />}
 
       {/* Main Page Content */}
       <main className="layout__main">
