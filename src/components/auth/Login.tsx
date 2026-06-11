@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ email: '', password: '', remember: false });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -10,11 +14,43 @@ const Login: React.FC = () => {
     setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Set mock authentication token
-    localStorage.setItem('token', 'mock-token');
-    navigate('/dashboard');
+    setError(null);
+
+    if (!form.email || !form.password) {
+      setError('Please enter both your email address and password.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${BASE_URL}/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Invalid email or password.');
+      }
+
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      navigate('/dashboard');
+      window.location.reload();
+    } catch (err: any) {
+      setError(err.message || 'An error occurred during sign in.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -36,6 +72,13 @@ const Login: React.FC = () => {
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <h2>Welcome <em>Back</em></h2>
           <p className="auth-form__sub">Sign in to access your portal</p>
+
+          {error && (
+            <div className="auth-error-alert">
+              <span>⚠️</span>
+              {error}
+            </div>
+          )}
 
           <div className="form-group">
             <label htmlFor="email">Email Address</label>
@@ -60,7 +103,9 @@ const Login: React.FC = () => {
             <label htmlFor="remember">Keep me signed in</label>
           </div>
 
-          <button type="submit" className="btn btn--primary btn--full">Sign In</button>
+          <button type="submit" className="btn btn--primary btn--full" disabled={loading}>
+            {loading ? 'Signing In...' : 'Sign In'}
+          </button>
 
           <div className="auth-divider"><span>or continue with</span></div>
 

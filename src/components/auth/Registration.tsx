@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 const Registration: React.FC = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
     password: '', confirmPassword: '',
@@ -14,10 +18,71 @@ const Registration: React.FC = () => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (step < 3) { setStep(s => s + 1); return; }
-    navigate('/login');
+    setError(null);
+
+    if (step === 1) {
+      if (!form.firstName || !form.lastName || !form.email || !form.phone || !form.password || !form.confirmPassword) {
+        setError('Please fill in all guardian and account details.');
+        return;
+      }
+      if (form.password !== form.confirmPassword) {
+        setError('Passwords do not match.');
+        return;
+      }
+      if (form.password.length < 8) {
+        setError('Password must be at least 8 characters long.');
+        return;
+      }
+      setStep(2);
+      return;
+    }
+
+    if (step === 2) {
+      if (!form.studentName || !form.gradeApplying) {
+        setError('Please fill in the student details.');
+        return;
+      }
+      if ((form.gradeApplying === 'Grade 11' || form.gradeApplying === 'Grade 12') && !form.strand) {
+        setError('Please select an SHS strand.');
+        return;
+      }
+      setStep(3);
+      return;
+    }
+
+    // Submit registration to Rust Backend
+    setLoading(true);
+    try {
+      const response = await fetch(`${BASE_URL}/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          firstName: form.firstName,
+          lastName: form.lastName,
+          email: form.email,
+          phone: form.phone,
+          password: form.password,
+          studentName: form.studentName,
+          gradeApplying: form.gradeApplying,
+          strand: (form.gradeApplying === 'Grade 11' || form.gradeApplying === 'Grade 12') ? form.strand : null,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Registration failed.');
+      }
+
+      navigate('/login');
+    } catch (err: any) {
+      setError(err.message || 'An error occurred during registration.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -45,6 +110,12 @@ const Registration: React.FC = () => {
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
+          {error && (
+            <div className="auth-error-alert">
+              <span>⚠️</span>
+              {error}
+            </div>
+          )}
           {step === 1 && (
             <>
               <h2>Create Your <em>Account</em></h2>
@@ -90,10 +161,10 @@ const Registration: React.FC = () => {
                 <label htmlFor="gradeApplying">Grade Level Applying For</label>
                 <select id="gradeApplying" name="gradeApplying" required value={form.gradeApplying} onChange={handleChange}>
                   <option value="">Select grade level…</option>
-                  {['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6',
-                    'Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'].map(g => (
-                    <option key={g} value={g}>{g}</option>
-                  ))}
+                  {['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6',
+                    'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'].map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
                 </select>
               </div>
               {(form.gradeApplying === 'Grade 11' || form.gradeApplying === 'Grade 12') && (
@@ -130,10 +201,10 @@ const Registration: React.FC = () => {
 
           <div className="auth-form__actions">
             {step > 1 && (
-              <button type="button" className="btn btn--ghost" onClick={() => setStep(s => s - 1)}>← Back</button>
+              <button type="button" className="btn btn--ghost" onClick={() => setStep(s => s - 1)} disabled={loading}>← Back</button>
             )}
-            <button type="submit" className="btn btn--primary btn--full">
-              {step < 3 ? 'Continue →' : 'Submit Application'}
+            <button type="submit" className="btn btn--primary btn--full" disabled={loading}>
+              {loading ? 'Submitting...' : step < 3 ? 'Continue →' : 'Submit Application'}
             </button>
           </div>
         </form>

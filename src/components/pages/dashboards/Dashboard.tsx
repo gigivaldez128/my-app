@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+
 import OverviewTab from './OverviewTab';
 import AcademicsTab from './AcademicsTab';
 import ScheduleTab from './ScheduleTab';
 import FinancesTab from './FinancesTab';
 import TasksTab from './TasksTab';
 import PaymentModal from './PaymentModal';
+
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 interface StudentInfo {
   name: string;
@@ -42,15 +45,6 @@ interface PaymentHistoryItem {
   receipt: string;
 }
 
-const studentInfo: StudentInfo = {
-  name: 'Juan Miguel dela Cruz',
-  id: '2024-10492',
-  level: 'Grade 11 — STEM',
-  advisor: 'Mr. Jonathan Cruz',
-  gpa: '93.8%',
-  status: 'Enrolled',
-};
-
 const announcements: Announcement[] = [
   { id: 1, date: 'June 05, 2026', title: 'SY 2026–2027 Enrollment Schedule', desc: 'Pre-enrollment for existing students starts next week. Please settle accounts before June 12.' },
   { id: 2, date: 'June 02, 2026', title: 'Tara Eskwela Sports Festival 2026', desc: 'Opening ceremony is scheduled this Friday. Varsity matches will commence across campuses.' },
@@ -77,6 +71,82 @@ const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [balance, setBalance] = useState<number>(12500);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
+
+  // Initialize studentInfo state from cached local storage or defaults
+  const [studentInfo, setStudentInfo] = useState<StudentInfo>(() => {
+    const cachedUser = localStorage.getItem('user');
+    if (cachedUser) {
+      try {
+        const u = JSON.parse(cachedUser);
+        return {
+          name: u.studentName || 'Student',
+          id: (u.id || '2024-10492').substring(0, 8).toUpperCase(),
+          level: `${u.gradeApplying || ''}${u.strand ? ' — ' + u.strand : ''}` || 'Grade 11 — STEM',
+          advisor: 'Mr. Jonathan Cruz',
+          gpa: '93.8%',
+          status: 'Enrolled',
+        };
+      } catch (e) {
+        // ignore and fallback
+      }
+    }
+    return {
+      name: 'Student',
+      id: '2024-10492',
+      level: 'Grade 11 — STEM',
+      advisor: 'Mr. Jonathan Cruz',
+      gpa: '93.8%',
+      status: 'Enrolled',
+    };
+  });
+
+  // Fetch fresh user profile on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${BASE_URL}/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            navigate('/login');
+            return;
+          }
+          throw new Error('Failed to fetch user profile');
+        }
+
+        const data = await response.json();
+        const u = data.user;
+
+        // Cache the latest user profile
+        localStorage.setItem('user', JSON.stringify(u));
+
+        setStudentInfo({
+          name: u.studentName || 'Student',
+          id: (u.id || '2024-10492').substring(0, 8).toUpperCase(),
+          level: `${u.gradeApplying || ''}${u.strand ? ' — ' + u.strand : ''}` || 'Grade 11 — STEM',
+          advisor: 'Mr. Jonathan Cruz',
+          gpa: '93.8%',
+          status: 'Enrolled',
+        });
+      } catch (err) {
+        console.error('Error fetching user profile:', err);
+      }
+    };
+
+    fetchProfile();
+  }, [navigate]);
 
   // Load / Save Tasks from localStorage
   const [tasks, setTasks] = useState<Task[]>(() => {
@@ -118,6 +188,7 @@ const Dashboard: React.FC = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     navigate('/');
   };
 
