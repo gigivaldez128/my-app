@@ -8,7 +8,7 @@ import FinancesTab from './FinancesTab';
 import TasksTab from './TasksTab';
 import PaymentModal from './PaymentModal';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://myengine-0f1p.onrender.com';
 
 interface StudentInfo {
   name: string;
